@@ -40,6 +40,7 @@ impl From<Method> for reqwest::Method {
 
 #[derive(Parser, Debug)]
 struct Cli {
+    /// The URL to request
     url: String,
 
     #[arg(short, long, default_value_t = Method::GET)]
@@ -52,6 +53,10 @@ struct Cli {
     /// Add a cookie to the request
     #[arg(short = 'c', long = "cookie", value_name = "NAME=VALUE")]
     cookies: Vec<String>,
+
+    /// Set the request body
+    #[arg(short, long)]
+    body: Option<String>,
 }
 
 #[tokio::main]
@@ -82,6 +87,10 @@ async fn main() {
         let name: HeaderName = name.parse().unwrap();
         let value: HeaderValue = value.parse().unwrap();
         request.headers_mut().insert(name, value);
+    }
+
+    if let Some(body) = args.body {
+        *request.body_mut() = Some(body.into());
     }
 
     let response = client.execute(request).await.unwrap();
