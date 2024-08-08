@@ -145,15 +145,76 @@ async fn main() {
         }
     }
 
-    println!("{}", "Body:".bold().underline());
-
     if is_json {
+        println!("{}", "Body (JSON):".bold().underline());
         let body: serde_json::Value = response.json().await.unwrap();
-        println!("{}", serde_json::to_string_pretty(&body).unwrap());
+        // println!("{}", serde_json::to_string_pretty(&body).unwrap());
+        pretty_print(&body, 0);
+        println!();
     } else {
+        println!("{}", "Body:".bold().underline());
         let body = response.text().await.unwrap();
         println!("{}", body);
     }
 
     // Ok(())
+}
+
+fn print_indent(depth: usize) {
+    for _ in 0..depth {
+        print!("  ");
+    }
+}
+
+fn pretty_print(value: &serde_json::Value, depth: usize) {
+    match value {
+        serde_json::Value::Null => print!("{}", "null".bright_magenta()),
+        serde_json::Value::Bool(bool) => print!("{}", bool.to_string().bright_purple()),
+        serde_json::Value::Number(number) => print!("{}", number.to_string().bright_cyan()),
+        serde_json::Value::String(string) => {
+            print!(
+                "{}{}{}",
+                "\"".bright_green(),
+                string.bright_green(),
+                "\"".bright_green()
+            )
+        }
+        serde_json::Value::Array(values) => {
+            print!("{}", "[".bright_black());
+            let multi_line = !values.is_empty();
+            if multi_line {
+                println!();
+            }
+            for value in values.iter().rev().skip(1).rev() {
+                print_indent(depth + 1);
+                pretty_print(value, depth + 1);
+                println!("{}", ",".bright_black());
+            }
+            if let Some(value) = values.last() {
+                print_indent(depth + 1);
+                pretty_print(value, depth + 1);
+                println!();
+            }
+            if multi_line {
+                print_indent(depth);
+            }
+            print!("{}", "]".bright_black());
+        }
+        serde_json::Value::Object(map) => {
+            println!("{}", "{".bright_black());
+            for (key, value) in map.iter() {
+                print_indent(depth + 1);
+                print!(
+                    "{}{}{} ",
+                    "\"".bright_black(),
+                    key.bold().bright_yellow(),
+                    "\":".bright_black(),
+                );
+                pretty_print(value, depth + 1);
+                println!("{}", ",".bright_black());
+            }
+            print_indent(depth);
+            print!("{}", "}".bright_black());
+        }
+    }
 }
