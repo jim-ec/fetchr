@@ -2,6 +2,10 @@
 name = "fetchr"
 version = "0.1.0"
 edition = "2021"
+license = "MIT"
+description = "A versatile Rust CLI tool for making HTTP requests"
+repository = "https://github.com/jim-ec/fetchr"
+readme = "README.md"
 
 [dependencies]
 clap = { version = "4.5.13", features = ["derive"] }
