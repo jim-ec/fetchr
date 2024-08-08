@@ -11,7 +11,11 @@ enum Method {
     POST,
     PUT,
     DELETE,
+    HEAD,
+    OPTIONS,
     PATCH,
+    TRACE,
+    CONNECT,
 }
 
 impl std::fmt::Display for Method {
@@ -22,6 +26,10 @@ impl std::fmt::Display for Method {
             Method::PUT => write!(f, "put"),
             Method::DELETE => write!(f, "delete"),
             Method::PATCH => write!(f, "patch"),
+            Method::HEAD => write!(f, "head"),
+            Method::OPTIONS => write!(f, "options"),
+            Method::TRACE => write!(f, "trace"),
+            Method::CONNECT => write!(f, "connect"),
         }
     }
 }
@@ -34,6 +42,10 @@ impl From<Method> for reqwest::Method {
             Method::PUT => reqwest::Method::PUT,
             Method::DELETE => reqwest::Method::DELETE,
             Method::PATCH => reqwest::Method::PATCH,
+            Method::HEAD => reqwest::Method::HEAD,
+            Method::OPTIONS => reqwest::Method::OPTIONS,
+            Method::TRACE => reqwest::Method::TRACE,
+            Method::CONNECT => reqwest::Method::CONNECT,
         }
     }
 }
