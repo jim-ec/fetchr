@@ -51,6 +51,7 @@ impl From<Method> for reqwest::Method {
 }
 
 #[derive(Parser, Debug)]
+#[command(version, about)]
 struct Cli {
     /// The URL to request
     url: String,
