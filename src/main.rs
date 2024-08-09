@@ -2,8 +2,10 @@ use std::sync::Arc;
 
 use clap::{Parser, ValueEnum};
 use colored::*;
-use header::{HeaderName, HeaderValue};
-use reqwest::*;
+use reqwest::{
+    header::{HeaderName, HeaderValue},
+    ClientBuilder, Request,
+};
 
 #[derive(Debug, Copy, Clone, ValueEnum)]
 enum Method {
@@ -73,11 +75,35 @@ struct Cli {
 }
 
 #[tokio::main]
-// async fn main() -> Result<(), Box<dyn std::error::Error>> {
 async fn main() {
+    match run().await {
+        Ok(_) => {}
+        Err(error) => {
+            eprintln!("{} {}", "Error:".red(), error.to_string().red());
+            std::process::exit(1);
+        }
+    }
+}
+
+#[derive(Debug)]
+enum ParserError {
+    InvalidHeader(String),
+}
+
+impl std::fmt::Display for ParserError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ParserError::InvalidHeader(header) => write!(f, "invalid header: \"{header}\""),
+        }
+    }
+}
+
+impl std::error::Error for ParserError {}
+
+async fn run() -> std::result::Result<(), Box<dyn std::error::Error>> {
     let args = Cli::parse();
 
-    let url = reqwest::Url::parse(&args.url).unwrap();
+    let url = reqwest::Url::parse(&args.url)?;
 
     let jar = reqwest::cookie::Jar::default();
     for cookie in &args.cookies {
@@ -86,8 +112,7 @@ async fn main() {
 
     let client = ClientBuilder::new()
         .cookie_provider(Arc::new(jar))
-        .build()
-        .unwrap();
+        .build()?;
 
     let method = args.method.into();
 
@@ -95,10 +120,16 @@ async fn main() {
 
     for header in &args.headers {
         let mut parts = header.split('=');
-        let name = parts.next().unwrap();
-        let value = parts.next().unwrap();
-        let name: HeaderName = name.parse().unwrap();
-        let value: HeaderValue = value.parse().unwrap();
+        let name = parts
+            .next()
+            .ok_or_else(|| ParserError::InvalidHeader(header.clone()))?;
+        let value = parts
+            .next()
+            .ok_or_else(|| ParserError::InvalidHeader(header.clone()))?;
+        let name: HeaderName = name.parse()?;
+        dbg!(&name);
+        let value: HeaderValue = value.parse()?;
+        dbg!(&value);
         request.headers_mut().insert(name, value);
     }
 
@@ -106,7 +137,7 @@ async fn main() {
         *request.body_mut() = Some(body.into());
     }
 
-    let response = client.execute(request).await.unwrap();
+    let response = client.execute(request).await?;
 
     let status = response.status();
 
@@ -148,17 +179,16 @@ async fn main() {
 
     if is_json {
         println!("{}", "Body (JSON):".bold().underline());
-        let body: serde_json::Value = response.json().await.unwrap();
-        // println!("{}", serde_json::to_string_pretty(&body).unwrap());
+        let body: serde_json::Value = response.json().await?;
         pretty_print(&body, 0);
         println!();
     } else {
         println!("{}", "Body:".bold().underline());
-        let body = response.text().await.unwrap();
+        let body = response.text().await?;
         println!("{}", body);
     }
 
-    // Ok(())
+    Ok(())
 }
 
 fn print_indent(depth: usize) {
