@@ -166,7 +166,7 @@ async fn run() -> std::result::Result<(), Box<dyn std::error::Error>> {
     for (key, value) in response.headers().iter() {
         println!("  {}: {:?}", key.to_string().bold(), value);
 
-        if key == "content-type" {
+        if key.as_str().contains("content-type") {
             if value
                 .to_str()
                 .map(|value| value == "application/json")
