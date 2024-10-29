@@ -127,9 +127,7 @@ async fn run() -> std::result::Result<(), Box<dyn std::error::Error>> {
             .next()
             .ok_or_else(|| ParserError::InvalidHeader(header.clone()))?;
         let name: HeaderName = name.parse()?;
-        dbg!(&name);
         let value: HeaderValue = value.parse()?;
-        dbg!(&value);
         request.headers_mut().insert(name, value);
     }
 
@@ -166,11 +164,10 @@ async fn run() -> std::result::Result<(), Box<dyn std::error::Error>> {
     for (key, value) in response.headers().iter() {
         println!("  {}: {:?}", key.to_string().bold(), value);
 
-        if key.as_str().contains("content-type") {
+        if key.as_str() == "content-type" {
             if value
                 .to_str()
-                .map(|value| value == "application/json")
-                .unwrap_or(false)
+                .is_ok_and(|value| value.contains("application/json"))
             {
                 is_json = true;
             }

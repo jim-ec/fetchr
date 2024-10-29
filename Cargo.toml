@@ -1,6 +1,6 @@
 [package]
 name = "fetchr"
-version = "0.1.2"
+version = "0.1.3"
 edition = "2021"
 license = "MIT"
 description = "A versatile Rust CLI tool for making HTTP requests"
