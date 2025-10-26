@@ -1,14 +1,17 @@
-use std::sync::Arc;
+use std::{path::PathBuf, sync::Arc};
 
 use clap::{Parser, ValueEnum};
 use colored::*;
+use config_file::FromConfigFile;
 use reqwest::{
     ClientBuilder, Request,
     header::{HeaderName, HeaderValue},
 };
+use serde::Deserialize;
 
-#[derive(Debug, Copy, Clone, ValueEnum)]
+#[derive(Debug, Default, Copy, Clone, ValueEnum, Deserialize)]
 enum Method {
+    #[default]
     GET,
     POST,
     PUT,
@@ -52,21 +55,23 @@ impl From<Method> for reqwest::Method {
     }
 }
 
-#[derive(Parser, Debug)]
+#[derive(Parser, Debug, Deserialize)]
 #[command(version, about)]
 struct Cli {
     /// The URL to request
-    url: String,
+    url: Option<String>,
 
-    #[arg(short, long, default_value_t = Method::GET)]
-    method: Method,
+    #[arg(short, long)]
+    method: Option<Method>,
 
     /// Add a header to the request
     #[arg(short = 'H', long = "header", value_name = "NAME=VALUE")]
+    #[serde(default)]
     headers: Vec<String>,
 
     /// Add a cookie to the request
     #[arg(short = 'c', long = "cookie", value_name = "NAME=VALUE")]
+    #[serde(default)]
     cookies: Vec<String>,
 
     /// Short hand notation for the `Authorization` header
@@ -79,7 +84,13 @@ struct Cli {
 
     /// Forces the body to be valid JSON
     #[arg(short = 'j', long = "json-body")]
-    body_is_json: bool,
+    json_body: Option<bool>,
+
+    /// Path to a TOML configuration file.
+    /// Configuration from the command-line takes precedence.
+    #[arg(long = "config")]
+    #[serde(skip)]
+    config_file: Option<PathBuf>,
 }
 
 #[tokio::main]
@@ -108,9 +119,23 @@ impl std::fmt::Display for Error {
 impl std::error::Error for Error {}
 
 async fn run() -> std::result::Result<(), Box<dyn std::error::Error>> {
-    let args = Cli::parse();
+    let mut args = Cli::parse();
 
-    let url = reqwest::Url::parse(&args.url)?;
+    if let Some(config_file) = args.config_file {
+        let mut config = Cli::from_config_file(config_file)?;
+
+        args.url = args.url.or(config.url);
+        args.method = args.method.or(config.method);
+        args.headers.append(&mut config.headers);
+        args.cookies.append(&mut config.cookies);
+        args.auth = args.auth.or(config.auth);
+        args.body = args.body.or(config.body);
+        args.json_body = args.json_body.or(config.json_body);
+    }
+
+    let Some(url) = args.url else { return Ok(()) };
+
+    let url = reqwest::Url::parse(&url)?;
 
     let jar = reqwest::cookie::Jar::default();
     for cookie in &args.cookies {
@@ -121,7 +146,7 @@ async fn run() -> std::result::Result<(), Box<dyn std::error::Error>> {
         .cookie_provider(Arc::new(jar))
         .build()?;
 
-    let method = args.method.into();
+    let method = args.method.unwrap_or_default().into();
 
     let mut request = Request::new(method, url);
 
@@ -143,7 +168,7 @@ async fn run() -> std::result::Result<(), Box<dyn std::error::Error>> {
     }
 
     if let Some(body) = args.body {
-        if args.body_is_json {
+        if args.json_body.unwrap_or_default() {
             if let Err(err) = serde_json5::from_str::<serde_json::Value>(&body) {
                 return Err(Box::new(Error::InvalidJson(err)));
             }
