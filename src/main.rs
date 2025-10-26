@@ -3,8 +3,8 @@ use std::sync::Arc;
 use clap::{Parser, ValueEnum};
 use colored::*;
 use reqwest::{
-    header::{HeaderName, HeaderValue},
     ClientBuilder, Request,
+    header::{HeaderName, HeaderValue},
 };
 
 #[derive(Debug, Copy, Clone, ValueEnum)]
@@ -69,6 +69,10 @@ struct Cli {
     #[arg(short = 'c', long = "cookie", value_name = "NAME=VALUE")]
     cookies: Vec<String>,
 
+    /// Short hand notation for the `Authorization` header
+    #[arg(short = 'a', long = "auth")]
+    auth: Option<String>,
+
     /// Set the request body
     #[arg(short, long)]
     body: Option<String>,
@@ -129,6 +133,10 @@ async fn run() -> std::result::Result<(), Box<dyn std::error::Error>> {
         let name: HeaderName = name.parse()?;
         let value: HeaderValue = value.parse()?;
         request.headers_mut().insert(name, value);
+    }
+
+    if let Some(auth) = args.auth {
+        request.headers_mut().insert("Authorization", auth.parse()?);
     }
 
     if let Some(body) = args.body {
