@@ -80,12 +80,9 @@ struct Cli {
 
 #[tokio::main]
 async fn main() {
-    match run().await {
-        Ok(_) => {}
-        Err(error) => {
-            eprintln!("{} {}", "Error:".red(), error.to_string().red());
-            std::process::exit(1);
-        }
+    if let Err(error) = run().await {
+        eprintln!("{} {error}", "Error:".red());
+        std::process::exit(1);
     }
 }
 
