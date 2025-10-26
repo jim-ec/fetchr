@@ -92,7 +92,7 @@ async fn main() {
 
 #[derive(Debug)]
 enum Error {
-    InvalidJson(serde_json::Error),
+    InvalidJson(serde_json5::Error),
     InvalidHeader(String),
 }
 
@@ -144,7 +144,7 @@ async fn run() -> std::result::Result<(), Box<dyn std::error::Error>> {
 
     if let Some(body) = args.body {
         if args.body_is_json {
-            if let Err(err) = serde_json::from_str::<serde_json::Value>(&body) {
+            if let Err(err) = serde_json5::from_str::<serde_json::Value>(&body) {
                 return Err(Box::new(Error::InvalidJson(err)));
             }
         }
@@ -191,15 +191,14 @@ async fn run() -> std::result::Result<(), Box<dyn std::error::Error>> {
         }
     }
 
+    println!("{}", "Body:".bold().underline());
+    let body = response.text().await?;
     if is_json {
-        println!("{}", "Body (JSON):".bold().underline());
-        let body: serde_json::Value = response.json().await?;
+        let body: serde_json::Value = serde_json5::from_str(&body)?;
         pretty_print(&body, 0);
         println!();
     } else {
-        println!("{}", "Body:".bold().underline());
-        let body = response.text().await?;
-        println!("{}", body);
+        println!("{body}");
     }
 
     Ok(())
@@ -230,15 +229,10 @@ fn pretty_print(value: &serde_json::Value, depth: usize) {
             if multi_line {
                 println!();
             }
-            for value in values.iter().rev().skip(1).rev() {
+            for value in values.iter() {
                 print_indent(depth + 1);
                 pretty_print(value, depth + 1);
                 println!("{}", ",".bright_black());
-            }
-            if let Some(value) = values.last() {
-                print_indent(depth + 1);
-                pretty_print(value, depth + 1);
-                println!();
             }
             if multi_line {
                 print_indent(depth);
