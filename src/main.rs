@@ -76,6 +76,10 @@ struct Cli {
     /// Set the request body
     #[arg(short, long)]
     body: Option<String>,
+
+    /// Forces the body to be valid JSON
+    #[arg(short = 'j', long = "json-body")]
+    body_is_json: bool,
 }
 
 #[tokio::main]
@@ -87,19 +91,21 @@ async fn main() {
 }
 
 #[derive(Debug)]
-enum ParserError {
+enum Error {
+    InvalidJson(serde_json::Error),
     InvalidHeader(String),
 }
 
-impl std::fmt::Display for ParserError {
+impl std::fmt::Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            ParserError::InvalidHeader(header) => write!(f, "invalid header: \"{header}\""),
+            Error::InvalidHeader(header) => write!(f, "Invalid header: \"{header}\""),
+            Error::InvalidJson(json_err) => write!(f, "Invalid JSON: {json_err}"),
         }
     }
 }
 
-impl std::error::Error for ParserError {}
+impl std::error::Error for Error {}
 
 async fn run() -> std::result::Result<(), Box<dyn std::error::Error>> {
     let args = Cli::parse();
@@ -123,10 +129,10 @@ async fn run() -> std::result::Result<(), Box<dyn std::error::Error>> {
         let mut parts = header.split('=');
         let name = parts
             .next()
-            .ok_or_else(|| ParserError::InvalidHeader(header.clone()))?;
+            .ok_or_else(|| Error::InvalidHeader(header.clone()))?;
         let value = parts
             .next()
-            .ok_or_else(|| ParserError::InvalidHeader(header.clone()))?;
+            .ok_or_else(|| Error::InvalidHeader(header.clone()))?;
         let name: HeaderName = name.parse()?;
         let value: HeaderValue = value.parse()?;
         request.headers_mut().insert(name, value);
@@ -137,6 +143,12 @@ async fn run() -> std::result::Result<(), Box<dyn std::error::Error>> {
     }
 
     if let Some(body) = args.body {
+        if args.body_is_json {
+            if let Err(err) = serde_json::from_str::<serde_json::Value>(&body) {
+                return Err(Box::new(Error::InvalidJson(err)));
+            }
+        }
+
         *request.body_mut() = Some(body.into());
     }
 
