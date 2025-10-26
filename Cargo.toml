@@ -13,5 +13,7 @@ reqwest = { version = "0.12", features = ["cookies"] }
 cookie = "0.18"
 tokio = { version = "1.48", features = ["full"] }
 colored = "3.0"
+serde = "1.0"
 serde_json = "1.0"
 serde_json5 = "0.2"
+config-file = "0.2"
