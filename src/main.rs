@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use base64::{Engine as _, engine::general_purpose};
-use clap::{Args, Parser, ValueEnum, builder::Styles};
+use clap::{Args, Parser, ValueEnum, builder::styling};
 use colored::*;
 use reqwest::{
     ClientBuilder,
@@ -326,37 +326,15 @@ fn pretty_print(value: &serde_json::Value, depth: usize) {
     }
 }
 
-fn styles() -> Styles {
-    Styles::styled()
-        .header(
-            anstyle::Style::new()
-                .bold()
-                .fg_color(Some(anstyle::Color::Ansi(anstyle::AnsiColor::Yellow))),
-        )
-        .usage(
-            anstyle::Style::new()
-                .bold()
-                .fg_color(Some(anstyle::Color::Ansi(anstyle::AnsiColor::Yellow))),
-        )
-        .literal(
-            anstyle::Style::new().fg_color(Some(anstyle::Color::Ansi(anstyle::AnsiColor::Green))),
-        )
-        .placeholder(
-            anstyle::Style::new().fg_color(Some(anstyle::Color::Ansi(anstyle::AnsiColor::Cyan))),
-        )
-        .error(
-            anstyle::Style::new()
-                .bold()
-                .fg_color(Some(anstyle::Color::Ansi(anstyle::AnsiColor::Red))),
-        )
-        .valid(
-            anstyle::Style::new()
-                .bold()
-                .fg_color(Some(anstyle::Color::Ansi(anstyle::AnsiColor::Green))),
-        )
-        .invalid(
-            anstyle::Style::new()
-                .bold()
-                .fg_color(Some(anstyle::Color::Ansi(anstyle::AnsiColor::Red))),
-        )
+fn styles() -> styling::Styles {
+    use styling::{AnsiColor, Style};
+
+    styling::Styles::styled()
+        .header(Style::new().bold().fg_color(Some(AnsiColor::Yellow.into())))
+        .usage(Style::new().bold().fg_color(Some(AnsiColor::Yellow.into())))
+        .literal(Style::new().fg_color(Some(AnsiColor::Green.into())))
+        .placeholder(Style::new().fg_color(Some(AnsiColor::Cyan.into())))
+        .error(Style::new().bold().fg_color(Some(AnsiColor::Red.into())))
+        .valid(Style::new().bold().fg_color(Some(AnsiColor::Green.into())))
+        .invalid(Style::new().bold().fg_color(Some(AnsiColor::Red.into())))
 }
