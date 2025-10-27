@@ -6,6 +6,7 @@ use colored::*;
 use reqwest::{
     ClientBuilder,
     header::{AUTHORIZATION, CONTENT_TYPE},
+    redirect::Policy,
 };
 
 #[derive(Debug, Copy, Clone, ValueEnum)]
@@ -75,6 +76,14 @@ struct Cli {
     #[arg(short = 'q', long = "query", value_name = "KEY=VALUE")]
     query_params: Vec<String>,
 
+    /// Follow redirects
+    #[arg(short = 'f', long = "follow")]
+    follow_redirects: bool,
+
+    /// Maximum number of redirects to follow
+    #[arg(long = "max-redirs", default_value = "10")]
+    max_redirects: usize,
+
     #[command(flatten)]
     auth_type: AuthType,
 
@@ -106,19 +115,19 @@ struct BodyType {
     /// Sets the `content-type=application/json` header.
     /// Denies the request if the body is syntactically malformed.
     /// Multiple bodies are concatenated.
-    #[arg(short = 'j', long = "json-body")]
+    #[arg(short = 'J', long = "json-body")]
     json: bool,
 
     /// The body is URL encoded.
     /// Sets the `content-type=application/x-www-form-urlencoded` header.
     /// Multiple bodies are concatenated with a `&` between them.
-    #[arg(short = 'u', long = "url-body")]
+    #[arg(short = 'U', long = "url-body")]
     url_encoded: bool,
 
     /// The body is a multipart form.
     /// Sets the `content-type=multipart/form-data` header.
     /// Multiple occurrences are allowed.
-    #[arg(short = 'f', long = "form-body")]
+    #[arg(short = 'F', long = "form-body")]
     form: bool,
 }
 
@@ -169,8 +178,15 @@ async fn run() -> std::result::Result<(), Box<dyn std::error::Error>> {
         jar.add_cookie_str(&cookie, &url);
     }
 
+    let redirect_policy = if args.follow_redirects {
+        Policy::limited(args.max_redirects)
+    } else {
+        Policy::none()
+    };
+
     let client = ClientBuilder::new()
         .cookie_provider(Arc::new(jar))
+        .redirect(redirect_policy)
         .build()?;
 
     let method = args.method.into();
