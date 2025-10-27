@@ -91,7 +91,7 @@ struct Cli {
     #[command(flatten)]
     auth_type: AuthType,
 
-    /// Add a body.
+    /// Add body contents.
     #[arg(short = 'b', long = "body")]
     bodies: Vec<String>,
 
