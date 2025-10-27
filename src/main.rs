@@ -55,26 +55,26 @@ impl From<Method> for reqwest::Method {
 #[derive(Parser, Debug)]
 #[command(version, about)]
 struct Cli {
-    /// The URL to request
+    /// The URL to request.
     url: String,
 
     #[arg(short, long, default_value_t = Method::GET)]
     method: Method,
 
-    /// Add a header to the request
+    /// Add a header to the request.
     #[arg(short = 'H', long = "header", value_name = "NAME=VALUE")]
     headers: Vec<String>,
 
-    /// Add a cookie to the request
+    /// Add a cookie to the request.
     #[arg(short = 'c', long = "cookie", value_name = "NAME=VALUE")]
     cookies: Vec<String>,
 
-    /// Short hand notation for the `Authorization` header
+    /// Short hand notation for the `Authorization` header.
     #[arg(short = 'a', long = "auth")]
     auth: Option<String>,
 
-    /// Set the request body
-    /// Multiple occurences are concatenated
+    /// Set the request body.
+    /// Multiple occurrences are concatenated.
     #[arg(short, long)]
     bodies: Vec<String>,
 
