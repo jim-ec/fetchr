@@ -71,6 +71,10 @@ struct Cli {
     #[arg(short = 'c', long = "cookie", value_name = "NAME=VALUE")]
     cookies: Vec<String>,
 
+    /// Add a query parameter to the URL.
+    #[arg(short = 'q', long = "query", value_name = "KEY=VALUE")]
+    query_params: Vec<String>,
+
     #[command(flatten)]
     auth_type: AuthType,
 
@@ -132,6 +136,7 @@ enum Error {
     InvalidJson(serde_json5::Error),
     InvalidHeader(String),
     InvalidFormField(String),
+    InvalidQueryParam(String),
 }
 
 impl std::fmt::Display for Error {
@@ -140,6 +145,7 @@ impl std::fmt::Display for Error {
             Error::InvalidHeader(header) => write!(f, "Invalid header: \"{header}\""),
             Error::InvalidJson(json_err) => write!(f, "Invalid JSON: {json_err}"),
             Error::InvalidFormField(field) => write!(f, "Invalid form field: \"{field}\""),
+            Error::InvalidQueryParam(param) => write!(f, "Invalid query parameter: \"{param}\""),
         }
     }
 }
@@ -149,7 +155,15 @@ impl std::error::Error for Error {}
 async fn run() -> std::result::Result<(), Box<dyn std::error::Error>> {
     let args = Cli::parse();
 
-    let url = reqwest::Url::parse(&args.url)?;
+    let mut url = reqwest::Url::parse(&args.url)?;
+
+    // Add query parameters
+    for query in &args.query_params {
+        let (key, value) = query
+            .split_once('=')
+            .ok_or_else(|| Error::InvalidQueryParam(query.clone()))?;
+        url.query_pairs_mut().append_pair(key, value);
+    }
 
     let jar = reqwest::cookie::Jar::default();
     for cookie in &args.cookies {
