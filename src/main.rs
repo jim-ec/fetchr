@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use clap::{Args, Parser, ValueEnum};
+use clap::{Args, Parser, ValueEnum, builder::Styles};
 use colored::*;
 use reqwest::{
     ClientBuilder, Request,
@@ -54,6 +54,7 @@ impl From<Method> for reqwest::Method {
 
 #[derive(Parser, Debug)]
 #[command(version, about)]
+#[command(styles = styles())]
 struct Cli {
     /// The URL to request.
     url: String,
@@ -285,4 +286,39 @@ fn pretty_print(value: &serde_json::Value, depth: usize) {
             print!("{}", "}".bright_black());
         }
     }
+}
+
+fn styles() -> Styles {
+    Styles::styled()
+        .header(
+            anstyle::Style::new()
+                .bold()
+                .fg_color(Some(anstyle::Color::Ansi(anstyle::AnsiColor::Yellow))),
+        )
+        .usage(
+            anstyle::Style::new()
+                .bold()
+                .fg_color(Some(anstyle::Color::Ansi(anstyle::AnsiColor::Yellow))),
+        )
+        .literal(
+            anstyle::Style::new().fg_color(Some(anstyle::Color::Ansi(anstyle::AnsiColor::Green))),
+        )
+        .placeholder(
+            anstyle::Style::new().fg_color(Some(anstyle::Color::Ansi(anstyle::AnsiColor::Cyan))),
+        )
+        .error(
+            anstyle::Style::new()
+                .bold()
+                .fg_color(Some(anstyle::Color::Ansi(anstyle::AnsiColor::Red))),
+        )
+        .valid(
+            anstyle::Style::new()
+                .bold()
+                .fg_color(Some(anstyle::Color::Ansi(anstyle::AnsiColor::Green))),
+        )
+        .invalid(
+            anstyle::Style::new()
+                .bold()
+                .fg_color(Some(anstyle::Color::Ansi(anstyle::AnsiColor::Red))),
+        )
 }
