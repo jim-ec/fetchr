@@ -141,6 +141,11 @@ async fn run() -> std::result::Result<(), Box<dyn std::error::Error>> {
     if let Some(auth) = args.auth {
         request.headers_mut().insert("Authorization", auth.parse()?);
     }
+    if args.body_is_json {
+        request
+            .headers_mut()
+            .insert("content-type", "application/json".parse()?);
+    }
 
     if let Some(body) = args.body {
         if args.body_is_json {
