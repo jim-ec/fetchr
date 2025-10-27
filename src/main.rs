@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use base64::{Engine as _, engine::general_purpose};
 use clap::{Args, Parser, ValueEnum, builder::Styles};
 use colored::*;
 use reqwest::{
@@ -70,9 +71,8 @@ struct Cli {
     #[arg(short = 'c', long = "cookie", value_name = "NAME=VALUE")]
     cookies: Vec<String>,
 
-    /// Short hand notation for the `Authorization` header.
-    #[arg(short = 'a', long = "auth")]
-    auth: Option<String>,
+    #[command(flatten)]
+    auth_type: AuthType,
 
     /// Set the request body.
     /// Multiple occurrences are concatenated.
@@ -81,6 +81,19 @@ struct Cli {
 
     #[command(flatten)]
     body_type: BodyType,
+}
+
+#[derive(Args, Debug)]
+#[group(required = false, multiple = false)]
+struct AuthType {
+    /// Short hand notation for the `Authorization` header.
+    #[arg(short = 'a', long = "auth")]
+    auth: Option<String>,
+
+    /// HTTP Basic Authentication in the format username:password.
+    /// If password is omitted, you will be prompted for it.
+    #[arg(long = "user", value_name = "USER[:PASSWORD]")]
+    user: Option<String>,
 }
 
 #[derive(Args, Debug)]
@@ -94,7 +107,7 @@ struct BodyType {
 
     /// The body is URL encoded.
     /// Sets the `content-type=application/x-www-form-urlencoded` header.
-    #[arg(short = 'u', long = "url-encoded-body")]
+    #[arg(long = "url-body")]
     url_encoded: bool,
 }
 
@@ -154,8 +167,25 @@ async fn run() -> std::result::Result<(), Box<dyn std::error::Error>> {
         request.headers_mut().insert(name, value);
     }
 
-    if let Some(auth) = args.auth {
+    if let Some(auth) = args.auth_type.auth {
         request.headers_mut().insert("authorization", auth.parse()?);
+    }
+
+    if let Some(user) = args.auth_type.user {
+        let auth_value = if user.contains(':') {
+            // username:password provided
+            let encoded = general_purpose::STANDARD.encode(user.as_bytes());
+            format!("Basic {}", encoded)
+        } else {
+            // Only username provided, prompt for password
+            let password = rpassword::prompt_password(format!("Enter password for {}: ", user))?;
+            let credentials = format!("{}:{}", user, password);
+            let encoded = general_purpose::STANDARD.encode(credentials.as_bytes());
+            format!("Basic {}", encoded)
+        };
+        request
+            .headers_mut()
+            .insert("authorization", auth_value.parse()?);
     }
     if args.body_type.url_encoded {
         request
