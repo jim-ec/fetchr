@@ -84,6 +84,10 @@ struct Cli {
     #[arg(long = "max-redirs", default_value = "10")]
     max_redirects: usize,
 
+    /// Print headers
+    #[arg(long = "print-headers")]
+    print_headers: bool,
+
     #[command(flatten)]
     auth_type: AuthType,
 
@@ -254,8 +258,7 @@ async fn run() -> std::result::Result<(), Box<dyn std::error::Error>> {
     let status = response.status();
 
     println!(
-        "{} {}",
-        "Status:".bold().underline(),
+        "{}",
         status
             .to_string()
             .bold()
@@ -272,25 +275,21 @@ async fn run() -> std::result::Result<(), Box<dyn std::error::Error>> {
             })
     );
 
-    let mut is_json = false;
-
-    println!("{}", "Headers:".bold().underline());
-    for (key, value) in response.headers().iter() {
-        println!("  {}: {:?}", key.to_string().bold(), value);
-
-        if key == CONTENT_TYPE {
-            if value
+    let response_is_json = response.headers().iter().any(|(key, value)| {
+        key == CONTENT_TYPE
+            && value
                 .to_str()
                 .is_ok_and(|value| value.contains("application/json"))
-            {
-                is_json = true;
-            }
+    });
+
+    if args.print_headers {
+        for (key, value) in response.headers().iter() {
+            println!("  {}={:?}", key.to_string().bold(), value);
         }
     }
 
-    println!("{}", "Body:".bold().underline());
     let body = response.text().await?;
-    if is_json {
+    if response_is_json {
         let body: serde_json::Value = serde_json5::from_str(&body)?;
         pretty_print(&body, 0);
         println!();
