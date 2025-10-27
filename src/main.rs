@@ -78,9 +78,8 @@ struct Cli {
     #[command(flatten)]
     auth_type: AuthType,
 
-    /// Set the request body.
-    /// Multiple occurrences are concatenated.
-    #[arg(short, long)]
+    /// Add a body.
+    #[arg(short = 'b', long = "body")]
     bodies: Vec<String>,
 
     #[command(flatten)]
