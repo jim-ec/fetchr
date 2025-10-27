@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use clap::{Parser, ValueEnum};
+use clap::{Args, Parser, ValueEnum};
 use colored::*;
 use reqwest::{
     ClientBuilder, Request,
@@ -78,13 +78,23 @@ struct Cli {
     #[arg(short, long)]
     bodies: Vec<String>,
 
-    /// Forces the body to be valid JSON
-    #[arg(short = 'j', long = "json-body")]
-    body_is_json: bool,
+    #[command(flatten)]
+    body_type: BodyType,
+}
 
-    /// Forces the body to be valid JSON
+#[derive(Args, Debug)]
+#[group(required = false, multiple = false)]
+struct BodyType {
+    /// The body is JSON.
+    /// Sets the `content-type=application/json` header.
+    /// Denies the request if the body is syntactically malformed.
+    #[arg(short = 'j', long = "json-body")]
+    json: bool,
+
+    /// The body is URL encoded.
+    /// Sets the `content-type=application/x-www-form-urlencoded` header.
     #[arg(short = 'u', long = "url-encoded-body")]
-    body_is_url_encoded: bool,
+    url_encoded: bool,
 }
 
 #[tokio::main]
@@ -146,12 +156,12 @@ async fn run() -> std::result::Result<(), Box<dyn std::error::Error>> {
     if let Some(auth) = args.auth {
         request.headers_mut().insert("authorization", auth.parse()?);
     }
-    if args.body_is_url_encoded {
+    if args.body_type.url_encoded {
         request
             .headers_mut()
             .insert("content-type", "application/x-www-form-urlencoded".parse()?);
     }
-    if args.body_is_json {
+    if args.body_type.json {
         request
             .headers_mut()
             .insert("content-type", "application/json".parse()?);
@@ -159,12 +169,12 @@ async fn run() -> std::result::Result<(), Box<dyn std::error::Error>> {
 
     let mut concatenated_body = String::new();
     for body in args.bodies {
-        if args.body_is_json {
+        if args.body_type.json {
             if let Err(err) = serde_json5::from_str::<serde_json::Value>(&body) {
                 return Err(Box::new(Error::InvalidJson(err)));
             }
         }
-        if args.body_is_url_encoded {
+        if args.body_type.url_encoded {
             concatenated_body.push('&');
         }
         concatenated_body += &body;
