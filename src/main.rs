@@ -91,7 +91,7 @@ struct Cli {
     #[command(flatten)]
     auth_type: AuthType,
 
-    /// Add body contents.
+    /// Add body contents (prefix with @ to read from file).
     #[arg(short = 'b', long = "body")]
     bodies: Vec<String>,
 
@@ -228,9 +228,18 @@ async fn run() -> std::result::Result<(), Box<dyn std::error::Error>> {
         request = request.header(CONTENT_TYPE, "application/json");
     }
 
+    let mut bodies = vec![];
+    for body in args.bodies {
+        bodies.push(if let Some(file_path) = body.strip_prefix('@') {
+            std::fs::read_to_string(file_path)?
+        } else {
+            body
+        });
+    }
+
     if args.body_type.form {
         let mut form = reqwest::multipart::Form::new();
-        for field in &args.bodies {
+        for field in bodies {
             let (key, value) = field
                 .split_once('=')
                 .ok_or_else(|| Error::InvalidFormField(field.clone()))?;
@@ -239,7 +248,7 @@ async fn run() -> std::result::Result<(), Box<dyn std::error::Error>> {
         request = request.multipart(form);
     } else {
         let mut concatenated_body = String::new();
-        for body in args.bodies {
+        for body in bodies {
             if args.body_type.json {
                 if let Err(err) = serde_json5::from_str::<serde_json::Value>(&body) {
                     return Err(Box::new(Error::InvalidJson(err)));
