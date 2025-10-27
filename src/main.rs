@@ -190,12 +190,12 @@ async fn run() -> std::result::Result<(), Box<dyn std::error::Error>> {
     if args.body_type.url_encoded {
         request
             .headers_mut()
-            .insert("content-type", "application/x-www-form-urlencoded".parse()?);
+            .insert(CONTENT_TYPE, "application/x-www-form-urlencoded".parse()?);
     }
     if args.body_type.json {
         request
             .headers_mut()
-            .insert("content-type", "application/json".parse()?);
+            .insert(CONTENT_TYPE, "application/json".parse()?);
     }
 
     let mut concatenated_body = String::new();
@@ -241,7 +241,7 @@ async fn run() -> std::result::Result<(), Box<dyn std::error::Error>> {
     for (key, value) in response.headers().iter() {
         println!("  {}: {:?}", key.to_string().bold(), value);
 
-        if key.as_str() == "content-type" {
+        if key == CONTENT_TYPE {
             if value
                 .to_str()
                 .is_ok_and(|value| value.contains("application/json"))
