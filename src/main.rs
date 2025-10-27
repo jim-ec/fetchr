@@ -4,8 +4,8 @@ use base64::{Engine as _, engine::general_purpose};
 use clap::{Args, Parser, ValueEnum, builder::Styles};
 use colored::*;
 use reqwest::{
-    ClientBuilder, Request,
-    header::{HeaderName, HeaderValue},
+    ClientBuilder,
+    header::{AUTHORIZATION, CONTENT_TYPE},
 };
 
 #[derive(Debug, Copy, Clone, ValueEnum)]
@@ -102,13 +102,21 @@ struct BodyType {
     /// The body is JSON.
     /// Sets the `content-type=application/json` header.
     /// Denies the request if the body is syntactically malformed.
+    /// Multiple bodies are concatenated.
     #[arg(short = 'j', long = "json-body")]
     json: bool,
 
     /// The body is URL encoded.
     /// Sets the `content-type=application/x-www-form-urlencoded` header.
-    #[arg(long = "url-body")]
+    /// Multiple bodies are concatenated with a `&` between them.
+    #[arg(short = 'u', long = "url-body")]
     url_encoded: bool,
+
+    /// The body is a multipart form.
+    /// Sets the `content-type=multipart/form-data` header.
+    /// Multiple occurrences are allowed.
+    #[arg(short = 'f', long = "form-body")]
+    form: bool,
 }
 
 #[tokio::main]
@@ -123,6 +131,7 @@ async fn main() {
 enum Error {
     InvalidJson(serde_json5::Error),
     InvalidHeader(String),
+    InvalidFormField(String),
 }
 
 impl std::fmt::Display for Error {
@@ -130,6 +139,7 @@ impl std::fmt::Display for Error {
         match self {
             Error::InvalidHeader(header) => write!(f, "Invalid header: \"{header}\""),
             Error::InvalidJson(json_err) => write!(f, "Invalid JSON: {json_err}"),
+            Error::InvalidFormField(field) => write!(f, "Invalid form field: \"{field}\""),
         }
     }
 }
@@ -152,67 +162,65 @@ async fn run() -> std::result::Result<(), Box<dyn std::error::Error>> {
 
     let method = args.method.into();
 
-    let mut request = Request::new(method, url);
+    let mut request = client.request(method, url);
 
     for header in &args.headers {
-        let mut parts = header.split('=');
-        let name = parts
-            .next()
+        let (name, value) = header
+            .split_once('=')
             .ok_or_else(|| Error::InvalidHeader(header.clone()))?;
-        let value = parts
-            .next()
-            .ok_or_else(|| Error::InvalidHeader(header.clone()))?;
-        let name: HeaderName = name.parse()?;
-        let value: HeaderValue = value.parse()?;
-        request.headers_mut().insert(name, value);
+        request = request.header(name, value);
     }
 
     if let Some(auth) = args.auth_type.auth {
-        request.headers_mut().insert("authorization", auth.parse()?);
+        request = request.header(AUTHORIZATION, auth);
     }
 
     if let Some(user) = args.auth_type.user {
         let auth_value = if user.contains(':') {
-            // username:password provided
             let encoded = general_purpose::STANDARD.encode(user.as_bytes());
             format!("Basic {}", encoded)
         } else {
-            // Only username provided, prompt for password
             let password = rpassword::prompt_password(format!("Enter password for {}: ", user))?;
             let credentials = format!("{}:{}", user, password);
             let encoded = general_purpose::STANDARD.encode(credentials.as_bytes());
             format!("Basic {}", encoded)
         };
-        request
-            .headers_mut()
-            .insert("authorization", auth_value.parse()?);
+        request = request.header(AUTHORIZATION, auth_value);
     }
+
     if args.body_type.url_encoded {
-        request
-            .headers_mut()
-            .insert(CONTENT_TYPE, "application/x-www-form-urlencoded".parse()?);
+        request = request.header(CONTENT_TYPE, "application/x-www-form-urlencoded");
     }
     if args.body_type.json {
-        request
-            .headers_mut()
-            .insert(CONTENT_TYPE, "application/json".parse()?);
+        request = request.header(CONTENT_TYPE, "application/json");
     }
 
-    let mut concatenated_body = String::new();
-    for body in args.bodies {
-        if args.body_type.json {
-            if let Err(err) = serde_json5::from_str::<serde_json::Value>(&body) {
-                return Err(Box::new(Error::InvalidJson(err)));
+    if args.body_type.form {
+        let mut form = reqwest::multipart::Form::new();
+        for field in &args.bodies {
+            let (key, value) = field
+                .split_once('=')
+                .ok_or_else(|| Error::InvalidFormField(field.clone()))?;
+            form = form.text(key.to_string(), value.to_string());
+        }
+        request = request.multipart(form);
+    } else {
+        let mut concatenated_body = String::new();
+        for body in args.bodies {
+            if args.body_type.json {
+                if let Err(err) = serde_json5::from_str::<serde_json::Value>(&body) {
+                    return Err(Box::new(Error::InvalidJson(err)));
+                }
             }
+            if args.body_type.url_encoded {
+                concatenated_body.push('&');
+            }
+            concatenated_body += &body;
         }
-        if args.body_type.url_encoded {
-            concatenated_body.push('&');
-        }
-        concatenated_body += &body;
+        request = request.body(concatenated_body);
     }
-    *request.body_mut() = Some(concatenated_body.into());
 
-    let response = client.execute(request).await?;
+    let response = client.execute(request.build()?).await?;
 
     let status = response.status();
 
