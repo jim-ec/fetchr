@@ -74,12 +74,17 @@ struct Cli {
     auth: Option<String>,
 
     /// Set the request body
+    /// Multiple occurences are concatenated
     #[arg(short, long)]
-    body: Option<String>,
+    bodies: Vec<String>,
 
     /// Forces the body to be valid JSON
     #[arg(short = 'j', long = "json-body")]
     body_is_json: bool,
+
+    /// Forces the body to be valid JSON
+    #[arg(short = 'u', long = "url-encoded-body")]
+    body_is_url_encoded: bool,
 }
 
 #[tokio::main]
@@ -139,7 +144,12 @@ async fn run() -> std::result::Result<(), Box<dyn std::error::Error>> {
     }
 
     if let Some(auth) = args.auth {
-        request.headers_mut().insert("Authorization", auth.parse()?);
+        request.headers_mut().insert("authorization", auth.parse()?);
+    }
+    if args.body_is_url_encoded {
+        request
+            .headers_mut()
+            .insert("content-type", "application/x-www-form-urlencoded".parse()?);
     }
     if args.body_is_json {
         request
@@ -147,15 +157,19 @@ async fn run() -> std::result::Result<(), Box<dyn std::error::Error>> {
             .insert("content-type", "application/json".parse()?);
     }
 
-    if let Some(body) = args.body {
+    let mut concatenated_body = String::new();
+    for body in args.bodies {
         if args.body_is_json {
             if let Err(err) = serde_json5::from_str::<serde_json::Value>(&body) {
                 return Err(Box::new(Error::InvalidJson(err)));
             }
         }
-
-        *request.body_mut() = Some(body.into());
+        if args.body_is_url_encoded {
+            concatenated_body.push('&');
+        }
+        concatenated_body += &body;
     }
+    *request.body_mut() = Some(concatenated_body.into());
 
     let response = client.execute(request).await?;
 
