@@ -4,7 +4,7 @@ use base64::prelude::*;
 use clap::{Args, Parser, ValueEnum, builder::styling};
 use colored::*;
 use reqwest::{
-    ClientBuilder,
+    blocking::{ClientBuilder, multipart::Form},
     header::{AUTHORIZATION, CONTENT_TYPE},
     redirect::Policy,
 };
@@ -135,9 +135,8 @@ struct BodyType {
     form: bool,
 }
 
-#[tokio::main]
-async fn main() {
-    if let Err(error) = run().await {
+fn main() {
+    if let Err(error) = run() {
         eprintln!("{} {error}", "Error:".red());
         std::process::exit(1);
     }
@@ -164,7 +163,7 @@ impl std::fmt::Display for Error {
 
 impl std::error::Error for Error {}
 
-async fn run() -> std::result::Result<(), Box<dyn std::error::Error>> {
+fn run() -> std::result::Result<(), Box<dyn std::error::Error>> {
     let args = Cli::parse();
 
     let mut url = reqwest::Url::parse(&args.url)?;
@@ -238,7 +237,7 @@ async fn run() -> std::result::Result<(), Box<dyn std::error::Error>> {
     }
 
     if args.body_type.form {
-        let mut form = reqwest::multipart::Form::new();
+        let mut form = Form::new();
         for field in bodies {
             let (key, value) = field
                 .split_once('=')
@@ -262,8 +261,8 @@ async fn run() -> std::result::Result<(), Box<dyn std::error::Error>> {
         request = request.body(concatenated_body);
     }
 
-    let response = client.execute(request.build()?).await?;
-
+    let request = request.build()?;
+    let response = client.execute(request)?;
     let status = response.status();
 
     println!(
@@ -297,7 +296,7 @@ async fn run() -> std::result::Result<(), Box<dyn std::error::Error>> {
         }
     }
 
-    let body = response.text().await?;
+    let body = response.text()?;
     if response_is_json {
         let body: serde_json::Value = serde_json5::from_str(&body)?;
         pretty_print(&body, 0);
