@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use base64::{Engine as _, engine::general_purpose};
+use base64::prelude::*;
 use clap::{Args, Parser, ValueEnum, builder::styling};
 use colored::*;
 use reqwest::{
@@ -210,12 +210,12 @@ async fn run() -> std::result::Result<(), Box<dyn std::error::Error>> {
 
     if let Some(user) = args.auth_type.user {
         let auth_value = if user.contains(':') {
-            let encoded = general_purpose::STANDARD.encode(user.as_bytes());
+            let encoded = BASE64_STANDARD.encode(user.as_bytes());
             format!("Basic {}", encoded)
         } else {
             let password = rpassword::prompt_password(format!("Enter password for {}: ", user))?;
             let credentials = format!("{}:{}", user, password);
-            let encoded = general_purpose::STANDARD.encode(credentials.as_bytes());
+            let encoded = BASE64_STANDARD.encode(credentials.as_bytes());
             format!("Basic {}", encoded)
         };
         request = request.header(AUTHORIZATION, auth_value);
