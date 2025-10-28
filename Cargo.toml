@@ -1,6 +1,6 @@
 [package]
 name = "fetchr"
-version = "0.2.2"
+version = "0.2.3"
 edition = "2024"
 license = "MIT"
 description = "A simple CLI tool to make HTTP requests"
