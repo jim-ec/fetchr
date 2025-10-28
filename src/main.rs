@@ -102,7 +102,7 @@ struct Cli {
 #[derive(Args, Debug)]
 #[group(required = false, multiple = false)]
 struct AuthType {
-    /// Short hand notation for the `Authorization` header.
+    /// Shorthand notation for the `Authorization` header.
     #[arg(short = 'a', long = "auth")]
     auth: Option<String>,
 
