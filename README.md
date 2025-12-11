@@ -29,6 +29,11 @@ Run the same command to update the tool.
 
 There are more options, just run `fetchr -h`.
 
+The status and header reports are printed to `stderr`, therefore the body can easily be piped into file:
+
+- `fetchr <url> --print-headers > image.png`: Print status code and header to the terminal, but the actual
+  body of the response to `image.png`.
+
 At this point, the README documentation is deliberately vague because the options might change, features be added or modified, etc. This will of course not be the case when this tool reaches `1.0`.
 
 If you need something this tool cannot do yet, please file an issue or PR. I myself am developing fetchr while I am using it at work.
