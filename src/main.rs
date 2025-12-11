@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{io::Read, sync::Arc};
 
 use base64::prelude::*;
 use clap::{Args, Parser, ValueEnum, builder::styling};
@@ -135,6 +135,28 @@ struct BodyType {
     form: bool,
 }
 
+#[derive(Debug, Clone)]
+enum BodyContent {
+    String(String),
+    Binary(Vec<u8>),
+}
+
+impl BodyContent {
+    fn to_string(self) -> Result<String, Error> {
+        match self {
+            BodyContent::String(s) => Ok(s),
+            BodyContent::Binary(bytes) => String::from_utf8(bytes).map_err(|_| Error::InvalidUtf8),
+        }
+    }
+
+    fn to_bytes(self) -> Vec<u8> {
+        match self {
+            BodyContent::String(s) => s.into_bytes(),
+            BodyContent::Binary(bytes) => bytes,
+        }
+    }
+}
+
 fn main() {
     if let Err(error) = run() {
         eprintln!("{} {error}", "Error:".red());
@@ -148,6 +170,7 @@ enum Error {
     InvalidHeader(String),
     InvalidFormField(String),
     InvalidQueryParam(String),
+    InvalidUtf8,
 }
 
 impl std::fmt::Display for Error {
@@ -157,6 +180,7 @@ impl std::fmt::Display for Error {
             Error::InvalidJson(json_err) => write!(f, "Invalid JSON: {json_err}"),
             Error::InvalidFormField(field) => write!(f, "Invalid form field: \"{field}\""),
             Error::InvalidQueryParam(param) => write!(f, "Invalid query parameter: \"{param}\""),
+            Error::InvalidUtf8 => write!(f, "Invalid UTF-8"),
         }
     }
 }
@@ -227,18 +251,22 @@ fn run() -> std::result::Result<(), Box<dyn std::error::Error>> {
         request = request.header(CONTENT_TYPE, "application/json");
     }
 
-    let mut bodies = vec![];
+    let mut bodies: Vec<BodyContent> = Vec::new();
     for body in args.bodies {
         bodies.push(if let Some(file_path) = body.strip_prefix('@') {
-            std::fs::read_to_string(file_path)?
+            let mut file = std::fs::File::open(file_path)?;
+            let mut buffer = Vec::new();
+            file.read_to_end(&mut buffer)?;
+            BodyContent::Binary(buffer)
         } else {
-            body
+            BodyContent::String(body)
         });
     }
 
     if args.body_type.form {
         let mut form = Form::new();
         for field in bodies {
+            let field = field.to_string()?;
             let (key, value) = field
                 .split_once('=')
                 .ok_or_else(|| Error::InvalidFormField(field.clone()))?;
@@ -246,17 +274,18 @@ fn run() -> std::result::Result<(), Box<dyn std::error::Error>> {
         }
         request = request.multipart(form);
     } else {
-        let mut concatenated_body = String::new();
+        let mut concatenated_body: Vec<u8> = Vec::new();
         for body in bodies {
             if args.body_type.json {
+                let body = body.clone().to_string()?;
                 if let Err(err) = serde_json5::from_str::<serde_json::Value>(&body) {
                     return Err(Box::new(Error::InvalidJson(err)));
                 }
             }
             if args.body_type.url_encoded {
-                concatenated_body.push('&');
+                concatenated_body.push('&' as u8);
             }
-            concatenated_body += &body;
+            concatenated_body.append(&mut body.to_bytes());
         }
         request = request.body(concatenated_body);
     }
