@@ -295,6 +295,9 @@ fn run() -> std::result::Result<(), Box<dyn std::error::Error>> {
     let mut response = client.execute(request)?;
     let status = response.status();
 
+    if atty::is(atty::Stream::Stderr) {
+        colored::control::set_override(true);
+    }
     eprintln!(
         "{}",
         status
@@ -313,6 +316,18 @@ fn run() -> std::result::Result<(), Box<dyn std::error::Error>> {
             })
     );
 
+    if args.print_headers {
+        for (key, value) in response.headers().iter() {
+            eprintln!(
+                "{}{}{}",
+                key.to_string().yellow().bold(),
+                "=".dimmed(),
+                value.to_str()?
+            );
+        }
+    }
+    colored::control::set_override(false);
+
     let response_is_json = response.headers().iter().any(|(key, value)| {
         key == CONTENT_TYPE
             && value
@@ -320,19 +335,17 @@ fn run() -> std::result::Result<(), Box<dyn std::error::Error>> {
                 .is_ok_and(|value| value.contains("application/json"))
     });
 
-    if args.print_headers {
-        for (key, value) in response.headers().iter() {
-            eprintln!("  {}={:?}", key.to_string().bold(), value);
-        }
-    }
-
     let mut bytes = Vec::new();
     response.read_to_end(&mut bytes)?;
     if response_is_json {
+        if atty::is(atty::Stream::Stdout) {
+            colored::control::set_override(true);
+        }
         let body = String::from_utf8(bytes)?;
         let body: serde_json::Value = serde_json5::from_str(&body)?;
         pretty_print(&body, 0);
         println!();
+        colored::control::set_override(false);
     } else {
         std::io::stdout().write_all(&bytes)?;
     }
