@@ -1,4 +1,7 @@
-use std::{io::Read, sync::Arc};
+use std::{
+    io::{Read, Write},
+    sync::Arc,
+};
 
 use base64::prelude::*;
 use clap::{Args, Parser, ValueEnum, builder::styling};
@@ -142,10 +145,10 @@ enum BodyContent {
 }
 
 impl BodyContent {
-    fn to_string(self) -> Result<String, Error> {
+    fn to_string(self) -> Result<String, std::string::FromUtf8Error> {
         match self {
             BodyContent::String(s) => Ok(s),
-            BodyContent::Binary(bytes) => String::from_utf8(bytes).map_err(|_| Error::InvalidUtf8),
+            BodyContent::Binary(bytes) => String::from_utf8(bytes),
         }
     }
 
@@ -170,7 +173,6 @@ enum Error {
     InvalidHeader(String),
     InvalidFormField(String),
     InvalidQueryParam(String),
-    InvalidUtf8,
 }
 
 impl std::fmt::Display for Error {
@@ -180,7 +182,6 @@ impl std::fmt::Display for Error {
             Error::InvalidJson(json_err) => write!(f, "Invalid JSON: {json_err}"),
             Error::InvalidFormField(field) => write!(f, "Invalid form field: \"{field}\""),
             Error::InvalidQueryParam(param) => write!(f, "Invalid query parameter: \"{param}\""),
-            Error::InvalidUtf8 => write!(f, "Invalid UTF-8"),
         }
     }
 }
@@ -291,10 +292,10 @@ fn run() -> std::result::Result<(), Box<dyn std::error::Error>> {
     }
 
     let request = request.build()?;
-    let response = client.execute(request)?;
+    let mut response = client.execute(request)?;
     let status = response.status();
 
-    println!(
+    eprintln!(
         "{}",
         status
             .to_string()
@@ -321,17 +322,19 @@ fn run() -> std::result::Result<(), Box<dyn std::error::Error>> {
 
     if args.print_headers {
         for (key, value) in response.headers().iter() {
-            println!("  {}={:?}", key.to_string().bold(), value);
+            eprintln!("  {}={:?}", key.to_string().bold(), value);
         }
     }
 
-    let body = response.text()?;
+    let mut bytes = Vec::new();
+    response.read_to_end(&mut bytes)?;
     if response_is_json {
+        let body = String::from_utf8(bytes)?;
         let body: serde_json::Value = serde_json5::from_str(&body)?;
         pretty_print(&body, 0);
         println!();
     } else {
-        println!("{body}");
+        std::io::stdout().write_all(&bytes)?;
     }
 
     Ok(())
