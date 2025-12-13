@@ -6,6 +6,7 @@ license = "MIT"
 description = "A simple CLI tool to make HTTP requests"
 repository = "https://github.com/jim-ec/fetchr"
 readme = "README.md"
+build = "build.rs"
 
 [dependencies]
 atty = "0.2"
@@ -17,3 +18,9 @@ serde_json = "1.0"
 serde_json5 = "0.2"
 base64 = "0.22"
 rpassword = "7.4"
+clap_complete = "4.5.61"
+
+[build-dependencies]
+clap = {version = "*", features = ["derive", "color"]}
+clap_complete = "*"
+reqwest = "*"
