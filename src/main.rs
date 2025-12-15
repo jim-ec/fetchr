@@ -1,5 +1,6 @@
 use std::{
     io::{Read, Write},
+    process::ExitCode,
     sync::Arc,
 };
 
@@ -36,10 +37,13 @@ impl BodyContent {
     }
 }
 
-fn main() {
-    if let Err(error) = run() {
-        eprintln!("{} {error}", "Error:".red());
-        std::process::exit(1);
+fn main() -> ExitCode {
+    match run() {
+        Ok(()) => ExitCode::SUCCESS,
+        Err(error) => {
+            eprintln!("{} {error}", "Error:".red());
+            ExitCode::FAILURE
+        }
     }
 }
 
