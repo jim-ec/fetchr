@@ -1,5 +1,7 @@
 use clap::{Args, Parser, ValueEnum, builder::styling};
 
+pub const STDIN: &str = "-";
+
 #[derive(Parser, Debug)]
 #[command(version, about)]
 #[command(styles = styles())]
@@ -22,9 +24,9 @@ pub struct Cli {
     #[arg(short = 'q', long = "query", value_name = "KEY=VALUE")]
     pub query_params: Vec<String>,
 
-    /// Follow redirects
-    #[arg(short = 'f', long = "follow")]
-    pub follow_redirects: bool,
+    /// Do not follow redirects
+    #[arg(long = "no-follow")]
+    pub no_follow_redirects: bool,
 
     /// Maximum number of redirects to follow
     #[arg(long = "max-redirs", default_value = "10")]
@@ -35,19 +37,27 @@ pub struct Cli {
     pub print_headers: bool,
 
     #[command(flatten)]
-    pub auth_type: AuthType,
-
-    /// Add body contents (prefix with @ to read from file).
-    #[arg(short = 'b', long = "body")]
-    pub bodies: Vec<String>,
+    pub auth_method: AuthMethod,
 
     #[command(flatten)]
-    pub body_type: BodyType,
+    pub body_source: BodySource,
+
+    /// The body is JSON.
+    /// Sets the `content-type=application/json` header.
+    /// Denies the request if the body is syntactically malformed.
+    #[arg(short = 'j', long = "json-body")]
+    pub json: bool,
+
+    /// The body is URL encoded.
+    /// Sets the `content-type=application/x-www-form-urlencoded` header.
+    /// Multiple bodies are concatenated with a `&` between them.
+    #[arg(long = "url-encoded-body")]
+    pub url_encoded_body: bool,
 }
 
 #[derive(Args, Debug)]
 #[group(required = false, multiple = false)]
-pub struct AuthType {
+pub struct AuthMethod {
     /// Shorthand notation for the `Authorization` header.
     #[arg(short = 'a', long = "auth")]
     pub auth: Option<String>,
@@ -58,27 +68,22 @@ pub struct AuthType {
     pub user: Option<String>,
 }
 
+// TODO: Use enum?
 #[derive(Args, Debug)]
 #[group(required = false, multiple = false)]
-pub struct BodyType {
-    /// The body is JSON.
-    /// Sets the `content-type=application/json` header.
-    /// Denies the request if the body is syntactically malformed.
-    /// Multiple bodies are concatenated.
-    #[arg(short = 'J', long = "json-body")]
-    pub json: bool,
+pub struct BodySource {
+    /// Add body contents
+    #[arg(short = 'b', long = "body")]
+    pub string: Option<String>,
 
-    /// The body is URL encoded.
-    /// Sets the `content-type=application/x-www-form-urlencoded` header.
-    /// Multiple bodies are concatenated with a `&` between them.
-    #[arg(short = 'U', long = "url-body")]
-    pub url_encoded: bool,
+    /// Read body contents from file (- for stdin)
+    #[arg(short = 'i', long = "input")]
+    pub path: Option<std::path::PathBuf>,
 
-    /// The body is a multipart form.
+    /// Add multipart form body.
     /// Sets the `content-type=multipart/form-data` header.
-    /// Multiple occurrences are allowed.
-    #[arg(short = 'F', long = "form-body")]
-    pub form: bool,
+    #[arg(short = 'F', long = "form-field")]
+    pub form_fields: Option<Vec<String>>,
 }
 
 #[derive(Debug, Copy, Clone, ValueEnum)]

@@ -86,10 +86,10 @@ fn run() -> std::result::Result<(), Box<dyn std::error::Error>> {
         jar.add_cookie_str(&cookie, &url);
     }
 
-    let redirect_policy = if args.follow_redirects {
-        Policy::limited(args.max_redirects)
-    } else {
+    let redirect_policy = if args.no_follow_redirects {
         Policy::none()
+    } else {
+        Policy::limited(args.max_redirects)
     };
 
     let client = ClientBuilder::new()
@@ -108,11 +108,11 @@ fn run() -> std::result::Result<(), Box<dyn std::error::Error>> {
         request = request.header(name, value);
     }
 
-    if let Some(auth) = args.auth_type.auth {
+    if let Some(auth) = args.auth_method.auth {
         request = request.header(AUTHORIZATION, auth);
     }
 
-    if let Some(user) = args.auth_type.user {
+    if let Some(user) = args.auth_method.user {
         let auth_value = if user.contains(':') {
             let encoded = BASE64_STANDARD.encode(user.as_bytes());
             format!("Basic {}", encoded)
@@ -125,51 +125,50 @@ fn run() -> std::result::Result<(), Box<dyn std::error::Error>> {
         request = request.header(AUTHORIZATION, auth_value);
     }
 
-    if args.body_type.url_encoded {
-        request = request.header(CONTENT_TYPE, "application/x-www-form-urlencoded");
-    }
-    if args.body_type.json {
+    // if args.url_encoded {
+    //     request = request.header(CONTENT_TYPE, "application/x-www-form-urlencoded");
+    // }
+    if args.json {
         request = request.header(CONTENT_TYPE, "application/json");
     }
 
-    let mut bodies: Vec<BodyContent> = Vec::new();
-    for body in args.bodies {
-        bodies.push(if let Some(file_path) = body.strip_prefix('@') {
-            let mut file = std::fs::File::open(file_path)?;
+    request = if let Some(string) = args.body_source.string {
+        request.body(string)
+    } else if let Some(path) = args.body_source.path {
+        if *path == *cli::STDIN {
+            let mut buffer = Vec::new();
+            std::io::stdin().read_to_end(&mut buffer)?;
+            request.body(buffer)
+        } else {
+            let mut file = std::fs::File::open(path)?;
             let mut buffer = Vec::new();
             file.read_to_end(&mut buffer)?;
-            BodyContent::Binary(buffer)
-        } else {
-            BodyContent::String(body)
-        });
-    }
-
-    if args.body_type.form {
+            request.body(buffer)
+        }
+    } else if let Some(form_fields) = args.body_source.form_fields {
         let mut form = Form::new();
-        for field in bodies {
-            let field = field.to_string()?;
+        for field in form_fields {
             let (key, value) = field
                 .split_once('=')
                 .ok_or_else(|| Error::InvalidFormField(field.clone()))?;
             form = form.text(key.to_string(), value.to_string());
         }
-        request = request.multipart(form);
+        request.multipart(form)
     } else {
-        let mut concatenated_body: Vec<u8> = Vec::new();
-        for body in bodies {
-            if args.body_type.json {
-                let body = body.clone().to_string()?;
-                if let Err(err) = serde_json5::from_str::<serde_json::Value>(&body) {
-                    return Err(Box::new(Error::InvalidJson(err)));
-                }
-            }
-            if args.body_type.url_encoded {
-                concatenated_body.push('&' as u8);
-            }
-            concatenated_body.append(&mut body.to_bytes());
-        }
-        request = request.body(concatenated_body);
-    }
+        request
+    };
+
+    // if args.json {
+    //     let body = body.clone().to_string()?;
+    //     if let Err(err) = serde_json5::from_str::<serde_json::Value>(&body) {
+    //         return Err(Box::new(Error::InvalidJson(err)));
+    //     }
+    // }
+
+    // TODO:
+    // if args.body_type.url_encoded {
+    //     concatenated_body.push('&' as u8);
+    // }
 
     let request = request.build()?;
     let mut response = client.execute(request)?;
